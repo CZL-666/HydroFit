@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#101828" />
+    <title>登录 - 个人管理</title>
+    <link rel="stylesheet" href="./styles.css?v=20260818" />
+  </head>
+  <body class="login-body">
+    <main class="login-shell">
+      <section class="login-card">
+        <p class="eyebrow">PERSONAL LOG</p>
+        <h1>登录</h1>
+        <form class="login-form" id="loginForm" autocomplete="on">
+          <label for="emailInput">账号</label>
+          <input id="emailInput" name="email" type="email" autocomplete="email" placeholder="邮箱" required />
+          <label for="passwordInput">密码</label>
+          <input id="passwordInput" name="password" type="password" autocomplete="current-password" placeholder="密码" required />
+          <button type="submit">进入</button>
+          <p id="loginNote">登录后会自动保留状态。</p>
+        </form>
+      </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="./config.js?v=20260818"></script>
+    <script src="./login.js?v=20260818"></script>
+  </body>
+</html>
