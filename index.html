@@ -3,45 +3,74 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#101828" />
+    <meta name="theme-color" content="#18212f" />
     <title>个人管理</title>
-    <link rel="stylesheet" href="./styles.css?v=20260818" />
+    <link rel="stylesheet" href="./styles.css?v=20260818b" />
   </head>
   <body>
     <main class="app-shell">
       <header class="app-header">
         <div>
           <p class="eyebrow">PERSONAL LOG</p>
-          <h1>今日状态</h1>
-          <span id="todayLabel">--</span>
+          <h1>习惯记录</h1>
         </div>
         <button class="text-button" id="logoutBtn" type="button">退出</button>
       </header>
 
-      <section class="quick-grid">
-        <article class="quick-card water">
-          <span>今日喝水</span>
-          <strong><b id="waterCount">0</b> 杯</strong>
+      <section class="month-panel">
+        <button class="month-button" id="prevMonthBtn" type="button" aria-label="上个月">‹</button>
+        <div>
+          <span>当前查看</span>
+          <strong id="monthTitle">--</strong>
+        </div>
+        <button class="month-button" id="nextMonthBtn" type="button" aria-label="下个月">›</button>
+      </section>
+
+      <section class="today-actions">
+        <article class="today-card water">
+          <span>今天喝水</span>
+          <strong><b id="todayWaterCount">0</b> 杯</strong>
           <div class="stepper">
-            <button id="waterMinusBtn" type="button" aria-label="少一杯">-</button>
-            <button id="waterPlusBtn" type="button" aria-label="多一杯">+</button>
+            <button id="todayWaterMinusBtn" type="button">-</button>
+            <button id="todayWaterPlusBtn" type="button">+</button>
           </div>
         </article>
-
-        <article class="quick-card workout">
-          <span>今日健身</span>
-          <strong id="workoutStatus">未完成</strong>
-          <button class="done-button" id="workoutToggleBtn" type="button">完成</button>
+        <article class="today-card workout">
+          <span>今天健身</span>
+          <strong id="todayWorkoutStatus">未完成</strong>
+          <button class="done-button" id="todayWorkoutBtn" type="button">完成</button>
         </article>
       </section>
 
       <section class="target-panel">
         <div>
-          <span>喝水目标</span>
-          <strong><b id="waterTargetText">8</b> 杯 / 天</strong>
+          <span>每日喝水目标</span>
+          <strong><b id="waterTargetText">8</b> 杯</strong>
         </div>
         <input id="waterTargetInput" type="range" min="1" max="20" step="1" value="8" />
-        <p id="waterNote">今天还差 8 杯。</p>
+      </section>
+
+      <section class="module-card water-module">
+        <div class="section-head">
+          <div>
+            <h2>喝水</h2>
+            <span id="waterMonthSummary">--</span>
+          </div>
+        </div>
+        <div class="chart-frame">
+          <canvas id="waterChart" width="640" height="300"></canvas>
+        </div>
+        <div class="water-days" id="waterDays"></div>
+      </section>
+
+      <section class="module-card workout-module">
+        <div class="section-head">
+          <div>
+            <h2>健身</h2>
+            <span id="workoutMonthSummary">--</span>
+          </div>
+        </div>
+        <div class="workout-calendar" id="workoutCalendar"></div>
       </section>
 
       <section class="metric-grid">
@@ -58,42 +87,29 @@
           <strong id="monthWaterAvg">0 杯</strong>
         </article>
       </section>
-
-      <section class="module-card water-module">
-        <div class="section-head">
-          <div>
-            <h2>本月喝水</h2>
-            <span id="waterMonthSummary">--</span>
-          </div>
-        </div>
-        <div class="chart-frame">
-          <canvas id="waterChart" width="640" height="300"></canvas>
-        </div>
-      </section>
-
-      <section class="module-card workout-module">
-        <div class="section-head">
-          <div>
-            <h2>本月健身</h2>
-            <span id="workoutMonthSummary">--</span>
-          </div>
-        </div>
-        <div class="workout-calendar" id="workoutCalendar"></div>
-      </section>
-
-      <section class="recent-section">
-        <div class="section-head">
-          <div>
-            <h2>最近记录</h2>
-            <span>最近 14 天</span>
-          </div>
-        </div>
-        <ol class="day-list" id="dayList"></ol>
-      </section>
     </main>
+
+    <dialog class="edit-dialog" id="editDialog">
+      <form method="dialog" class="edit-card">
+        <div>
+          <p class="eyebrow">EDIT DAY</p>
+          <h2 id="editDateTitle">编辑记录</h2>
+        </div>
+        <label for="editWaterInput">喝水杯数</label>
+        <input id="editWaterInput" type="number" min="0" max="40" step="1" value="0" />
+        <label class="check-row">
+          <input id="editWorkoutInput" type="checkbox" />
+          <span>这天健身了</span>
+        </label>
+        <menu>
+          <button class="ghost-button" id="cancelEditBtn" value="cancel" type="submit">取消</button>
+          <button class="save-button" id="saveEditBtn" value="default" type="button">保存</button>
+        </menu>
+      </form>
+    </dialog>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="./config.js?v=20260818"></script>
-    <script src="./app.js?v=20260818"></script>
+    <script src="./app.js?v=20260818b"></script>
   </body>
 </html>

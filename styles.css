@@ -57,8 +57,8 @@ button {
 .quick-card,
 .target-panel,
 .metric-grid,
-.day-item,
-.day-tags {
+.month-panel,
+.edit-card menu {
   display: flex;
 }
 
@@ -97,9 +97,7 @@ h2 {
 .section-head span,
 .quick-card span,
 .metric-grid span,
-.day-item span,
 .target-panel span,
-.target-panel p,
 .login-form p {
   color: var(--muted);
   font-size: 13px;
@@ -109,7 +107,12 @@ h2 {
 .text-button,
 .done-button,
 .stepper button,
-.login-form button {
+.login-form button,
+.month-button,
+.water-day,
+.workout-day,
+.ghost-button,
+.save-button {
   border: 0;
   border-radius: 8px;
   font-weight: 900;
@@ -132,13 +135,52 @@ h2 {
 .target-panel,
 .metric-grid article,
 .module-card,
-.recent-section,
+.month-panel,
 .login-card {
   border: 1px solid rgba(215, 226, 223, 0.92);
   border-radius: 8px;
   background: var(--surface);
   box-shadow: var(--shadow);
   backdrop-filter: blur(16px);
+}
+
+.month-panel {
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 13px;
+}
+
+.month-panel div {
+  min-width: 0;
+  text-align: center;
+}
+
+.month-panel span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.month-panel strong {
+  display: block;
+  margin-top: 3px;
+  font-size: 22px;
+}
+
+.month-button {
+  width: 44px;
+  height: 44px;
+  background: var(--surface-solid);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  font-size: 26px;
+}
+
+.month-button:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 
 .quick-card {
@@ -239,13 +281,12 @@ h2 {
   line-height: 1.1;
 }
 
-.module-card,
-.recent-section {
+.module-card {
   padding: 14px;
 }
 
 .module-card + .module-card,
-.recent-section {
+.metric-grid {
   margin-top: 12px;
 }
 
@@ -266,13 +307,53 @@ h2 {
 
 .chart-frame {
   width: 100%;
-  height: 220px;
+  height: 190px;
   padding: 8px 0 0;
 }
 
 #waterChart {
   width: 100%;
   height: 100%;
+}
+
+.water-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.water-day {
+  display: grid;
+  gap: 2px;
+  place-items: center;
+  min-height: 48px;
+  background: #eef7fb;
+  color: #075985;
+  border: 1px solid rgba(2, 132, 199, 0.1);
+}
+
+.water-day span {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.water-day strong {
+  font-size: 15px;
+}
+
+.water-day.hit {
+  background: var(--water);
+  color: #fff;
+}
+
+.water-day.hit span {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.water-day.today {
+  outline: 2px solid var(--sun);
+  outline-offset: 2px;
 }
 
 .workout-calendar {
@@ -285,7 +366,6 @@ h2 {
   display: grid;
   place-items: center;
   aspect-ratio: 1;
-  border-radius: 8px;
   background: #eef2f7;
   color: var(--muted);
   font-size: 13px;
@@ -300,59 +380,6 @@ h2 {
 .workout-day.today {
   outline: 2px solid var(--sun);
   outline-offset: 2px;
-}
-
-.day-list {
-  display: grid;
-  gap: 8px;
-  max-height: min(390px, 44vh);
-  overflow: auto;
-  overscroll-behavior: contain;
-  margin: 0;
-  padding: 0 2px 2px 0;
-  list-style: none;
-}
-
-.day-item {
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  min-height: 58px;
-  padding: 10px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface-solid);
-}
-
-.day-item strong {
-  display: block;
-  font-size: 16px;
-}
-
-.day-tags {
-  align-items: center;
-  justify-content: flex-end;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.tag {
-  min-width: 54px;
-  padding: 5px 8px;
-  border-radius: 999px;
-  text-align: center;
-  font-size: 12px;
-  font-weight: 900;
-}
-
-.tag.water {
-  background: var(--water-soft);
-  color: #0369a1;
-}
-
-.tag.workout {
-  background: var(--workout-soft);
-  color: #166534;
 }
 
 .login-body {
@@ -418,6 +445,76 @@ h2 {
 
 button:active {
   transform: translateY(1px);
+}
+
+.edit-dialog {
+  width: min(calc(100% - 28px), 420px);
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+}
+
+.edit-dialog::backdrop {
+  background: rgba(15, 23, 42, 0.38);
+}
+
+.edit-card {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+.edit-card label,
+.check-row span {
+  font-weight: 900;
+}
+
+.edit-card input[type="number"] {
+  width: 100%;
+  height: 48px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 12px;
+  outline: none;
+}
+
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.check-row input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--workout);
+}
+
+.edit-card menu {
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 4px 0 0;
+  padding: 0;
+}
+
+.ghost-button,
+.save-button {
+  height: 42px;
+  padding: 0 16px;
+}
+
+.ghost-button {
+  background: #eef2f7;
+  color: var(--muted);
+}
+
+.save-button {
+  background: var(--ink);
+  color: #fff;
 }
 
 @media (max-width: 420px) {

@@ -1,27 +1,35 @@
 const TARGET_STORAGE_KEY = "personal-tracker-water-target";
 
 const logoutBtn = document.querySelector("#logoutBtn");
-const todayLabel = document.querySelector("#todayLabel");
-const waterCount = document.querySelector("#waterCount");
-const waterMinusBtn = document.querySelector("#waterMinusBtn");
-const waterPlusBtn = document.querySelector("#waterPlusBtn");
+const prevMonthBtn = document.querySelector("#prevMonthBtn");
+const nextMonthBtn = document.querySelector("#nextMonthBtn");
+const monthTitle = document.querySelector("#monthTitle");
+const todayWaterCount = document.querySelector("#todayWaterCount");
+const todayWaterMinusBtn = document.querySelector("#todayWaterMinusBtn");
+const todayWaterPlusBtn = document.querySelector("#todayWaterPlusBtn");
+const todayWorkoutStatus = document.querySelector("#todayWorkoutStatus");
+const todayWorkoutBtn = document.querySelector("#todayWorkoutBtn");
 const waterTargetInput = document.querySelector("#waterTargetInput");
 const waterTargetText = document.querySelector("#waterTargetText");
-const waterNote = document.querySelector("#waterNote");
-const workoutStatus = document.querySelector("#workoutStatus");
-const workoutToggleBtn = document.querySelector("#workoutToggleBtn");
-const currentStreak = document.querySelector("#currentStreak");
-const yearWorkoutDays = document.querySelector("#yearWorkoutDays");
-const monthWaterAvg = document.querySelector("#monthWaterAvg");
 const waterMonthSummary = document.querySelector("#waterMonthSummary");
 const workoutMonthSummary = document.querySelector("#workoutMonthSummary");
 const waterChart = document.querySelector("#waterChart");
+const waterDays = document.querySelector("#waterDays");
 const workoutCalendar = document.querySelector("#workoutCalendar");
-const dayList = document.querySelector("#dayList");
+const currentStreak = document.querySelector("#currentStreak");
+const yearWorkoutDays = document.querySelector("#yearWorkoutDays");
+const monthWaterAvg = document.querySelector("#monthWaterAvg");
+const editDialog = document.querySelector("#editDialog");
+const editDateTitle = document.querySelector("#editDateTitle");
+const editWaterInput = document.querySelector("#editWaterInput");
+const editWorkoutInput = document.querySelector("#editWorkoutInput");
+const saveEditBtn = document.querySelector("#saveEditBtn");
 
 let currentUser = null;
 let waterRecords = [];
 let workoutRecords = [];
+let selectedMonth = new Date();
+let editingDateKey = null;
 
 function toDateKey(date = new Date()) {
   const year = date.getFullYear();
@@ -41,17 +49,24 @@ function shiftDateKey(dateKey, offset) {
   return toDateKey(date);
 }
 
-function getMonthStart() {
-  const now = new Date();
-  return toDateKey(new Date(now.getFullYear(), now.getMonth(), 1));
+function getMonthIdentity(date = selectedMonth) {
+  return {
+    year: date.getFullYear(),
+    month: date.getMonth(),
+  };
 }
 
-function getMonthDays() {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
+function getMonthDays(date = selectedMonth) {
+  const { year, month } = getMonthIdentity(date);
   const totalDays = new Date(year, month + 1, 0).getDate();
   return Array.from({ length: totalDays }, (_, index) => toDateKey(new Date(year, month, index + 1)));
+}
+
+function formatMonth(date = selectedMonth) {
+  return new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
+    month: "long",
+  }).format(date);
 }
 
 function formatDateKey(dateKey) {
@@ -68,14 +83,6 @@ function getWaterMap() {
 
 function getWorkoutMap() {
   return new Map(workoutRecords.map((record) => [record.record_date, Boolean(record.completed)]));
-}
-
-function getTodayWaterCups() {
-  return getWaterMap().get(toDateKey()) || 0;
-}
-
-function isTodayWorkoutDone() {
-  return getWorkoutMap().get(toDateKey()) || false;
 }
 
 function getWaterTarget() {
@@ -96,28 +103,26 @@ async function loadRecords() {
   workoutRecords = workoutResult.data || [];
 }
 
-async function saveWaterCups(cups) {
-  const recordDate = toDateKey();
+async function saveWaterCups(dateKey, cups) {
   const { data, error } = await supabaseClient
     .from(WATER_TABLE)
-    .upsert({ user_id: currentUser.id, record_date: recordDate, cups }, { onConflict: "user_id,record_date" })
+    .upsert({ user_id: currentUser.id, record_date: dateKey, cups }, { onConflict: "user_id,record_date" })
     .select("id, record_date, cups")
     .single();
 
   if (error) throw error;
-  waterRecords = waterRecords.filter((record) => record.record_date !== recordDate).concat(data);
+  waterRecords = waterRecords.filter((record) => record.record_date !== dateKey).concat(data);
 }
 
-async function saveWorkout(completed) {
-  const recordDate = toDateKey();
+async function saveWorkout(dateKey, completed) {
   const { data, error } = await supabaseClient
     .from(WORKOUT_TABLE)
-    .upsert({ user_id: currentUser.id, record_date: recordDate, completed }, { onConflict: "user_id,record_date" })
+    .upsert({ user_id: currentUser.id, record_date: dateKey, completed }, { onConflict: "user_id,record_date" })
     .select("id, record_date, completed")
     .single();
 
   if (error) throw error;
-  workoutRecords = workoutRecords.filter((record) => record.record_date !== recordDate).concat(data);
+  workoutRecords = workoutRecords.filter((record) => record.record_date !== dateKey).concat(data);
 }
 
 function countCurrentWorkoutStreak() {
@@ -136,48 +141,50 @@ function countYearWorkouts() {
   return workoutRecords.filter((record) => record.completed && parseDateKey(record.record_date).getFullYear() === year).length;
 }
 
-function getMonthWaterStats() {
+function getSelectedMonthStats() {
   const waterMap = getWaterMap();
-  const days = getMonthDays();
-  const today = toDateKey();
-  const elapsedDays = days.filter((dateKey) => dateKey <= today);
-  const total = elapsedDays.reduce((sum, dateKey) => sum + (waterMap.get(dateKey) || 0), 0);
-  const hitDays = elapsedDays.filter((dateKey) => (waterMap.get(dateKey) || 0) >= getWaterTarget()).length;
-  return {
-    average: elapsedDays.length ? total / elapsedDays.length : 0,
-    hitDays,
-    elapsedDays: elapsedDays.length,
-  };
-}
-
-function getMonthWorkoutStats() {
   const workoutMap = getWorkoutMap();
   const days = getMonthDays();
   const today = toDateKey();
-  const elapsedDays = days.filter((dateKey) => dateKey <= today);
-  const doneDays = elapsedDays.filter((dateKey) => workoutMap.get(dateKey)).length;
-  return { doneDays, elapsedDays: elapsedDays.length };
+  const visibleDays = days.filter((dateKey) => dateKey <= today || dateKey.slice(0, 7) !== today.slice(0, 7));
+  const waterTotal = visibleDays.reduce((sum, dateKey) => sum + (waterMap.get(dateKey) || 0), 0);
+  const waterHitDays = visibleDays.filter((dateKey) => (waterMap.get(dateKey) || 0) >= getWaterTarget()).length;
+  const workoutDays = visibleDays.filter((dateKey) => workoutMap.get(dateKey)).length;
+
+  return {
+    totalDays: visibleDays.length,
+    waterAverage: visibleDays.length ? waterTotal / visibleDays.length : 0,
+    waterHitDays,
+    workoutDays,
+  };
+}
+
+function renderHeader() {
+  const today = new Date();
+  const viewingCurrentMonth =
+    selectedMonth.getFullYear() === today.getFullYear() && selectedMonth.getMonth() === today.getMonth();
+  monthTitle.textContent = formatMonth();
+  nextMonthBtn.disabled = viewingCurrentMonth;
 }
 
 function renderToday() {
-  const cups = getTodayWaterCups();
-  const target = getWaterTarget();
-  const workoutDone = isTodayWorkoutDone();
-
-  todayLabel.textContent = formatDateKey(toDateKey());
-  waterCount.textContent = String(cups);
-  waterTargetText.textContent = String(target);
-  waterNote.textContent = cups >= target ? "今天喝水达标了。" : `今天还差 ${target - cups} 杯。`;
-  workoutStatus.textContent = workoutDone ? "已完成" : "未完成";
-  workoutToggleBtn.textContent = workoutDone ? "取消" : "完成";
-  workoutToggleBtn.classList.toggle("done", workoutDone);
+  const waterMap = getWaterMap();
+  const workoutMap = getWorkoutMap();
+  const today = toDateKey();
+  const cups = waterMap.get(today) || 0;
+  const done = workoutMap.get(today) || false;
+  todayWaterCount.textContent = String(cups);
+  todayWorkoutStatus.textContent = done ? "已完成" : "未完成";
+  todayWorkoutBtn.textContent = done ? "取消" : "完成";
+  todayWorkoutBtn.classList.toggle("done", done);
+  waterTargetText.textContent = String(getWaterTarget());
 }
 
-function renderSummary() {
-  const waterStats = getMonthWaterStats();
+function renderMetrics() {
+  const stats = getSelectedMonthStats();
   currentStreak.textContent = `${countCurrentWorkoutStreak()} 天`;
   yearWorkoutDays.textContent = `${countYearWorkouts()} 天`;
-  monthWaterAvg.textContent = `${Number(waterStats.average.toFixed(1))} 杯`;
+  monthWaterAvg.textContent = `${Number(stats.waterAverage.toFixed(1))} 杯`;
 }
 
 function drawWaterChart() {
@@ -194,115 +201,126 @@ function drawWaterChart() {
   const days = getMonthDays();
   const values = days.map((dateKey) => waterMap.get(dateKey) || 0);
   const maxValue = Math.max(target, ...values, 1);
-  const padding = { top: 18, right: 10, bottom: 28, left: 28 };
+  const padding = { top: 18, right: 8, bottom: 28, left: 28 };
   const plotWidth = rect.width - padding.left - padding.right;
   const plotHeight = rect.height - padding.top - padding.bottom;
-  const barGap = 3;
-  const barWidth = Math.max(4, (plotWidth - barGap * (days.length - 1)) / days.length);
+  const gap = 3;
+  const barWidth = Math.max(4, (plotWidth - gap * (days.length - 1)) / days.length);
   const targetY = padding.top + plotHeight - (target / maxValue) * plotHeight;
 
-  ctx.strokeStyle = "rgba(14, 116, 144, 0.25)";
+  ctx.strokeStyle = "rgba(2, 132, 199, 0.3)";
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(padding.left, targetY);
   ctx.lineTo(rect.width - padding.right, targetY);
   ctx.stroke();
 
-  ctx.fillStyle = "#64748b";
+  ctx.fillStyle = "#65758a";
   ctx.font = "11px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif";
   ctx.fillText(`${target}杯`, 0, targetY + 4);
 
   days.forEach((dateKey, index) => {
     const value = values[index];
     const height = value ? Math.max(4, (value / maxValue) * plotHeight) : 2;
-    const x = padding.left + index * (barWidth + barGap);
+    const x = padding.left + index * (barWidth + gap);
     const y = padding.top + plotHeight - height;
     ctx.fillStyle = value >= target ? "#0f766e" : "#38bdf8";
     ctx.fillRect(x, y, barWidth, height);
 
     const day = parseDateKey(dateKey).getDate();
     if (day === 1 || day % 5 === 0 || dateKey === toDateKey()) {
-      ctx.fillStyle = "#64748b";
+      ctx.fillStyle = "#65758a";
       ctx.fillText(String(day), x - 1, rect.height - 8);
     }
   });
 }
 
+function renderWaterDays() {
+  const waterMap = getWaterMap();
+  waterDays.innerHTML = "";
+
+  getMonthDays().forEach((dateKey) => {
+    const cups = waterMap.get(dateKey) || 0;
+    const button = document.createElement("button");
+    button.className = "water-day";
+    button.type = "button";
+    button.dataset.date = dateKey;
+    button.classList.toggle("hit", cups >= getWaterTarget());
+    button.classList.toggle("today", dateKey === toDateKey());
+    button.innerHTML = `<span>${parseDateKey(dateKey).getDate()}</span><strong>${cups}</strong>`;
+    waterDays.appendChild(button);
+  });
+}
+
 function renderWaterModule() {
-  const stats = getMonthWaterStats();
-  waterMonthSummary.textContent = `已过 ${stats.elapsedDays} 天，达标 ${stats.hitDays} 天`;
+  const stats = getSelectedMonthStats();
+  waterMonthSummary.textContent = `日均 ${Number(stats.waterAverage.toFixed(1))} 杯，达标 ${stats.waterHitDays} 天`;
   drawWaterChart();
+  renderWaterDays();
 }
 
 function renderWorkoutModule() {
   const workoutMap = getWorkoutMap();
-  const days = getMonthDays();
-  const stats = getMonthWorkoutStats();
-  workoutMonthSummary.textContent = `本月已练 ${stats.doneDays} 天`;
+  const stats = getSelectedMonthStats();
+  workoutMonthSummary.textContent = `已练 ${stats.workoutDays} 天`;
   workoutCalendar.innerHTML = "";
 
-  days.forEach((dateKey) => {
-    const day = document.createElement("div");
-    day.className = "workout-day";
-    day.classList.toggle("done", Boolean(workoutMap.get(dateKey)));
-    day.classList.toggle("today", dateKey === toDateKey());
-    day.textContent = String(parseDateKey(dateKey).getDate());
-    workoutCalendar.appendChild(day);
-  });
-}
-
-function renderRecentList() {
-  const waterMap = getWaterMap();
-  const workoutMap = getWorkoutMap();
-  const today = toDateKey();
-  dayList.innerHTML = "";
-
-  Array.from({ length: 14 }, (_, index) => shiftDateKey(today, -index)).forEach((dateKey) => {
-    const item = document.createElement("li");
-    item.className = "day-item";
-    item.innerHTML = `
-      <div>
-        <strong>${dateKey === today ? "今天" : formatDateKey(dateKey)}</strong>
-        <span>${dateKey}</span>
-      </div>
-      <div class="day-tags">
-        <span class="tag water">${waterMap.get(dateKey) || 0} 杯</span>
-        <span class="tag workout">${workoutMap.get(dateKey) ? "已练" : "未练"}</span>
-      </div>
-    `;
-    dayList.appendChild(item);
+  getMonthDays().forEach((dateKey) => {
+    const button = document.createElement("button");
+    button.className = "workout-day";
+    button.type = "button";
+    button.dataset.date = dateKey;
+    button.classList.toggle("done", Boolean(workoutMap.get(dateKey)));
+    button.classList.toggle("today", dateKey === toDateKey());
+    button.textContent = String(parseDateKey(dateKey).getDate());
+    workoutCalendar.appendChild(button);
   });
 }
 
 function render() {
+  renderHeader();
   renderToday();
-  renderSummary();
+  renderMetrics();
   renderWaterModule();
   renderWorkoutModule();
-  renderRecentList();
 }
+
+function changeMonth(offset) {
+  selectedMonth = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + offset, 1);
+  render();
+}
+
+function openEditor(dateKey) {
+  const waterMap = getWaterMap();
+  const workoutMap = getWorkoutMap();
+  editingDateKey = dateKey;
+  editDateTitle.textContent = formatDateKey(dateKey);
+  editWaterInput.value = String(waterMap.get(dateKey) || 0);
+  editWorkoutInput.checked = Boolean(workoutMap.get(dateKey));
+  editDialog.showModal();
+}
+
+prevMonthBtn.addEventListener("click", () => changeMonth(-1));
+nextMonthBtn.addEventListener("click", () => changeMonth(1));
 
 logoutBtn.addEventListener("click", async () => {
   await supabaseClient.auth.signOut();
   location.href = "./login.html";
 });
 
-waterMinusBtn.addEventListener("click", async () => {
-  try {
-    await saveWaterCups(Math.max(0, getTodayWaterCups() - 1));
-    render();
-  } catch (error) {
-    waterNote.textContent = error.message || "保存失败，请稍后重试。";
-  }
+todayWaterMinusBtn.addEventListener("click", async () => {
+  await saveWaterCups(toDateKey(), Math.max(0, (getWaterMap().get(toDateKey()) || 0) - 1));
+  render();
 });
 
-waterPlusBtn.addEventListener("click", async () => {
-  try {
-    await saveWaterCups(getTodayWaterCups() + 1);
-    render();
-  } catch (error) {
-    waterNote.textContent = error.message || "保存失败，请稍后重试。";
-  }
+todayWaterPlusBtn.addEventListener("click", async () => {
+  await saveWaterCups(toDateKey(), (getWaterMap().get(toDateKey()) || 0) + 1);
+  render();
+});
+
+todayWorkoutBtn.addEventListener("click", async () => {
+  await saveWorkout(toDateKey(), !(getWorkoutMap().get(toDateKey()) || false));
+  render();
 });
 
 waterTargetInput.addEventListener("input", () => {
@@ -310,13 +328,22 @@ waterTargetInput.addEventListener("input", () => {
   render();
 });
 
-workoutToggleBtn.addEventListener("click", async () => {
-  try {
-    await saveWorkout(!isTodayWorkoutDone());
-    render();
-  } catch {
-    workoutStatus.textContent = "保存失败";
-  }
+waterDays.addEventListener("click", (event) => {
+  const button = event.target.closest(".water-day");
+  if (button) openEditor(button.dataset.date);
+});
+
+workoutCalendar.addEventListener("click", (event) => {
+  const button = event.target.closest(".workout-day");
+  if (button) openEditor(button.dataset.date);
+});
+
+saveEditBtn.addEventListener("click", async () => {
+  if (!editingDateKey) return;
+  const cups = Math.max(0, Math.min(40, Math.round(Number(editWaterInput.value) || 0)));
+  await Promise.all([saveWaterCups(editingDateKey, cups), saveWorkout(editingDateKey, editWorkoutInput.checked)]);
+  editDialog.close();
+  render();
 });
 
 window.addEventListener("resize", drawWaterChart);
