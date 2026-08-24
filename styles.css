@@ -62,7 +62,7 @@ h2 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 27px;
 .period-picker { display: flex; align-items: center; gap: 8px; border: 0; background: transparent; color: var(--ink); }
 .period-picker strong { font-family: Georgia, "Times New Roman", serif; font-size: 22px; }
 .period-picker span { color: var(--muted); }
-#monthPicker { position: absolute; left: 50%; bottom: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.period-picker { min-height: 44px; padding: 0 14px; touch-action: manipulation; }
 
 .module { margin-top: 14px; padding: 22px 18px 18px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); box-shadow: var(--shadow); }
 .module-header { align-items: flex-start; justify-content: space-between; gap: 18px; }
@@ -135,6 +135,18 @@ h2 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 27px;
 .toast { position: fixed; left: 50%; bottom: max(24px, env(safe-area-inset-bottom)); z-index: 20; padding: 11px 16px; border-radius: 4px; background: var(--ink); color: white; font-size: 12px; opacity: 0; transform: translate(-50%, 12px); pointer-events: none; transition: .2s ease; }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 .toast.error { background: #a13622; }
+.period-card { gap: 18px; }
+.picker-year-row { display: grid; grid-template-columns: 42px 1fr 42px; align-items: center; gap: 12px; }
+.picker-year-row strong { text-align: center; font-family: Georgia, "Times New Roman", serif; font-size: 24px; }
+.picker-month-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.picker-month { height: 48px; border: 1px solid var(--line); border-radius: 4px; background: #f5f2eb; color: var(--ink); font-weight: 750; }
+.picker-month.selected { border-color: var(--water); background: var(--water); color: white; }
+.loading-screen { position: fixed; inset: 0; z-index: 50; display: grid; align-content: center; justify-items: center; gap: 14px; padding: 20px; background: var(--paper); color: var(--muted); transition: opacity .2s ease, visibility .2s ease; }
+.loading-screen.hidden { visibility: hidden; opacity: 0; pointer-events: none; }
+.loading-screen p { margin: 0; font-size: 13px; }
+.loading-mark { width: 34px; height: 34px; border: 3px solid var(--line); border-top-color: var(--water); border-radius: 50%; animation: loading-spin .8s linear infinite; }
+body.is-loading { overflow: hidden; }
+@keyframes loading-spin { to { transform: rotate(360deg); } }
 
 .login-body { display: grid; place-items: center; padding: 20px; background: var(--paper); }
 .login-shell { width: min(100%, 410px); }

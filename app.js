@@ -4,7 +4,7 @@ const $ = (selector) => document.querySelector(selector);
 const elements = {
   logoutBtn: $("#logoutBtn"), todayLabel: $("#todayLabel"), viewTabs: $(".view-tabs"),
   prevPeriodBtn: $("#prevPeriodBtn"), nextPeriodBtn: $("#nextPeriodBtn"), goTodayBtn: $("#goTodayBtn"),
-  periodPickerBtn: $("#periodPickerBtn"), periodTitle: $("#periodTitle"), monthPicker: $("#monthPicker"),
+  periodPickerBtn: $("#periodPickerBtn"), periodTitle: $("#periodTitle"),
   todayWaterCount: $("#todayWaterCount"), todayWaterMinusBtn: $("#todayWaterMinusBtn"), todayWaterPlusBtn: $("#todayWaterPlusBtn"),
   todayWorkoutStatus: $("#todayWorkoutStatus"), todayWorkoutBtn: $("#todayWorkoutBtn"),
   waterPrimaryStat: $("#waterPrimaryStat"), waterPrimaryLabel: $("#waterPrimaryLabel"), waterSummary: $("#waterSummary"),
@@ -15,7 +15,11 @@ const elements = {
   workoutGrid: $("#workoutGrid"), workoutWeekdays: $("#workoutWeekdays"), workoutSummary: $("#workoutSummary"),
   editDialog: $("#editDialog"), editDateTitle: $("#editDateTitle"), editWaterInput: $("#editWaterInput"),
   editWorkoutInput: $("#editWorkoutInput"), saveEditBtn: $("#saveEditBtn"), editNote: $("#editNote"),
-  targetDialog: $("#targetDialog"), targetInput: $("#targetInput"), saveTargetBtn: $("#saveTargetBtn"), toast: $("#toast"),
+  targetDialog: $("#targetDialog"), targetInput: $("#targetInput"), saveTargetBtn: $("#saveTargetBtn"),
+  periodDialog: $("#periodDialog"), pickerYearTitle: $("#pickerYearTitle"), pickerMonthGrid: $("#pickerMonthGrid"),
+  pickerPrevYearBtn: $("#pickerPrevYearBtn"), pickerNextYearBtn: $("#pickerNextYearBtn"),
+  cancelPeriodBtn: $("#cancelPeriodBtn"), confirmPeriodBtn: $("#confirmPeriodBtn"),
+  loadingScreen: $("#loadingScreen"), loadingText: $("#loadingText"), toast: $("#toast"),
 };
 
 let currentUser = null;
@@ -25,6 +29,9 @@ let viewMode = "month";
 let selectedDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let editingDateKey = null;
 let toastTimer = null;
+let pickerYear = selectedDate.getFullYear();
+let isLoadingRecords = false;
+let lastLoadedAt = 0;
 
 function toDateKey(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -128,6 +135,16 @@ function showToast(message, error = false) {
   toastTimer = setTimeout(() => elements.toast.classList.remove("show"), 2200);
 }
 
+function delay(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+function setLoading(loading, message = "正在读取你的记录...") {
+  elements.loadingText.textContent = message;
+  elements.loadingScreen.classList.toggle("hidden", !loading);
+  document.body.classList.toggle("is-loading", loading);
+}
+
 async function loadRecords() {
   const since = `${selectedDate.getFullYear() - 1}-01-01`;
   const until = `${selectedDate.getFullYear() + 1}-12-31`;
@@ -139,6 +156,35 @@ async function loadRecords() {
   if (workoutResult.error) throw workoutResult.error;
   waterRecords = waterResult.data || [];
   workoutRecords = workoutResult.data || [];
+}
+
+async function loadRecordsWithRetry({ showLoading = true } = {}) {
+  if (isLoadingRecords) return;
+  isLoadingRecords = true;
+  if (showLoading) setLoading(true);
+  let lastError = null;
+
+  try {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        if (attempt > 0) {
+          setLoading(true, `连接不稳定，正在重试（${attempt + 1}/3）...`);
+          await supabaseClient.auth.refreshSession();
+        }
+        await loadRecords();
+        lastLoadedAt = Date.now();
+        render();
+        return;
+      } catch (error) {
+        lastError = error;
+        if (attempt < 2) await delay(500 * (attempt + 1));
+      }
+    }
+    throw lastError;
+  } finally {
+    isLoadingRecords = false;
+    setLoading(false);
+  }
 }
 
 async function saveWaterCups(dateKey, cups) {
@@ -163,8 +209,6 @@ function renderHeader() {
   elements.periodTitle.textContent = viewMode === "month"
     ? new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "long" }).format(selectedDate)
     : `${selectedDate.getFullYear()} 年`;
-  elements.monthPicker.value = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, "0")}`;
-  elements.monthPicker.max = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const atCurrent = viewMode === "month"
     ? selectedDate.getFullYear() === now.getFullYear() && selectedDate.getMonth() === now.getMonth()
     : selectedDate.getFullYear() === now.getFullYear();
@@ -379,15 +423,58 @@ async function changePeriod(offset) {
   selectedDate = viewMode === "month"
     ? new Date(selectedDate.getFullYear(), selectedDate.getMonth() + offset, 1)
     : new Date(selectedDate.getFullYear() + offset, 0, 1);
-  await loadRecords();
-  render();
+  try {
+    await loadRecordsWithRetry();
+  } catch (error) {
+    showToast(error.message || "数据加载失败，请稍后重试", true);
+  }
 }
 
 async function setViewMode(mode) {
   viewMode = mode;
   if (mode === "year") selectedDate = new Date(selectedDate.getFullYear(), 0, 1);
-  await loadRecords();
-  render();
+  try {
+    await loadRecordsWithRetry();
+  } catch (error) {
+    showToast(error.message || "数据加载失败，请稍后重试", true);
+  }
+}
+
+function renderPeriodPicker() {
+  const now = new Date();
+  elements.pickerYearTitle.textContent = `${pickerYear} 年`;
+  elements.pickerNextYearBtn.disabled = pickerYear >= now.getFullYear();
+  elements.pickerMonthGrid.hidden = viewMode === "year";
+  elements.confirmPeriodBtn.hidden = viewMode === "month";
+  elements.pickerMonthGrid.innerHTML = "";
+
+  for (let month = 0; month < 12; month += 1) {
+    const button = document.createElement("button");
+    const isFuture = pickerYear > now.getFullYear() || (pickerYear === now.getFullYear() && month > now.getMonth());
+    button.type = "button";
+    button.className = "picker-month";
+    button.dataset.month = month;
+    button.disabled = isFuture;
+    button.classList.toggle("selected", pickerYear === selectedDate.getFullYear() && month === selectedDate.getMonth());
+    button.textContent = `${month + 1}月`;
+    elements.pickerMonthGrid.appendChild(button);
+  }
+}
+
+function openPeriodPicker() {
+  pickerYear = selectedDate.getFullYear();
+  renderPeriodPicker();
+  elements.periodDialog.showModal();
+}
+
+async function applySelectedPeriod(year, month = 0) {
+  selectedDate = new Date(year, viewMode === "month" ? month : 0, 1);
+  elements.periodDialog.close();
+  try {
+    await loadRecordsWithRetry();
+  } catch (error) {
+    showToast(error.message || "数据加载失败，请稍后重试", true);
+  }
 }
 
 function openEditor(dateKey) {
@@ -419,16 +506,18 @@ elements.viewTabs.addEventListener("click", (event) => {
 elements.prevPeriodBtn.addEventListener("click", () => changePeriod(-1));
 elements.nextPeriodBtn.addEventListener("click", () => changePeriod(1));
 elements.goTodayBtn.addEventListener("click", async () => {
-  const now = new Date(); selectedDate = new Date(now.getFullYear(), viewMode === "month" ? now.getMonth() : 0, 1); await loadRecords(); render();
+  const now = new Date();
+  selectedDate = new Date(now.getFullYear(), viewMode === "month" ? now.getMonth() : 0, 1);
+  try { await loadRecordsWithRetry(); } catch (error) { showToast(error.message || "数据加载失败", true); }
 });
-elements.periodPickerBtn.addEventListener("click", () => {
-  if (viewMode === "month" && elements.monthPicker.showPicker) elements.monthPicker.showPicker();
-  else elements.monthPicker.click();
-});
-elements.monthPicker.addEventListener("change", async () => {
-  if (!elements.monthPicker.value) return;
-  const [year, month] = elements.monthPicker.value.split("-").map(Number);
-  selectedDate = new Date(year, viewMode === "month" ? month - 1 : 0, 1); await loadRecords(); render();
+elements.periodPickerBtn.addEventListener("click", openPeriodPicker);
+elements.pickerPrevYearBtn.addEventListener("click", () => { pickerYear -= 1; renderPeriodPicker(); });
+elements.pickerNextYearBtn.addEventListener("click", () => { pickerYear += 1; renderPeriodPicker(); });
+elements.cancelPeriodBtn.addEventListener("click", () => elements.periodDialog.close());
+elements.confirmPeriodBtn.addEventListener("click", () => applySelectedPeriod(pickerYear));
+elements.pickerMonthGrid.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-month]");
+  if (button && !button.disabled) applySelectedPeriod(pickerYear, Number(button.dataset.month));
 });
 elements.waterDays.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-date]"); if (button) openEditor(button.dataset.date);
@@ -464,10 +553,47 @@ window.addEventListener("resize", drawWaterChart);
 
 async function init() {
   if (!localStorage.getItem(TARGET_STORAGE_KEY)) localStorage.setItem(TARGET_STORAGE_KEY, "8");
-  const { data: { session }, error } = await supabaseClient.auth.getSession();
-  if (error || !session) { location.href = "./login.html"; return; }
+  setLoading(true, "正在恢复登录状态...");
+
+  let session = null;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const result = await supabaseClient.auth.getSession();
+    if (result.data.session) {
+      session = result.data.session;
+      break;
+    }
+    if (attempt < 3) await delay(350);
+  }
+
+  if (!session) {
+    location.replace("./login.html");
+    return;
+  }
+
   currentUser = session.user;
-  try { await loadRecords(); render(); } catch (loadError) { showToast(loadError.message || "数据加载失败", true); }
+  try {
+    await loadRecordsWithRetry();
+  } catch (error) {
+    showToast(error.message || "数据加载失败，请检查网络后重试", true);
+  }
 }
+
+supabaseClient.auth.onAuthStateChange((event, session) => {
+  if (event === "SIGNED_OUT") {
+    location.replace("./login.html");
+    return;
+  }
+  if (session?.user) currentUser = session.user;
+});
+
+window.addEventListener("online", () => {
+  if (currentUser) loadRecordsWithRetry({ showLoading: false }).catch(() => showToast("重新连接失败", true));
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && currentUser && Date.now() - lastLoadedAt > 60000) {
+    loadRecordsWithRetry({ showLoading: false }).catch(() => {});
+  }
+});
 
 init();

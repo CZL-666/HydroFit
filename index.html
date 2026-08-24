@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#f4f1ea" />
     <title>日常记录</title>
-    <link rel="stylesheet" href="./styles.css?v=20260819-2" />
+    <link rel="stylesheet" href="./styles.css?v=20260824" />
   </head>
   <body>
     <main class="app-shell">
@@ -50,7 +50,6 @@
           <span>⌄</span>
         </button>
         <button class="icon-button" id="nextPeriodBtn" type="button" aria-label="下一时间段">›</button>
-        <input id="monthPicker" type="month" aria-label="选择月份" />
       </section>
 
       <section class="module water-module">
@@ -120,9 +119,29 @@
       </form>
     </dialog>
 
+    <dialog class="edit-dialog period-dialog" id="periodDialog">
+      <div class="edit-card period-card">
+        <div class="picker-year-row">
+          <button class="icon-button" id="pickerPrevYearBtn" type="button" aria-label="上一年">‹</button>
+          <strong id="pickerYearTitle">2026 年</strong>
+          <button class="icon-button" id="pickerNextYearBtn" type="button" aria-label="下一年">›</button>
+        </div>
+        <div class="picker-month-grid" id="pickerMonthGrid"></div>
+        <menu>
+          <button class="ghost-button" id="cancelPeriodBtn" type="button">取消</button>
+          <button class="save-button" id="confirmPeriodBtn" type="button">查看这一年</button>
+        </menu>
+      </div>
+    </dialog>
+
+    <div class="loading-screen" id="loadingScreen" aria-live="polite">
+      <span class="loading-mark"></span>
+      <p id="loadingText">正在读取你的记录...</p>
+    </div>
+
     <div class="toast" id="toast" role="status"></div>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="./config.js?v=20260818"></script>
-    <script src="./app.js?v=20260819-2"></script>
+    <script src="./app.js?v=20260824"></script>
   </body>
 </html>
